@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-import random
+from fastapi.middleware.cors import CORSMiddleware
 from apipipiipiiipppipipipiipipipipipipip.Pemainininininininininininin import Router as pemain_router
 from apipipiipiiipppipipipiipipipipipipip.Pertanyaaan import Router as pertanyaan_router
 from apipipiipiiipppipipipiipipipipipipip.Tantangan import Router as tantangan_router
@@ -16,6 +16,10 @@ app.include_router(router=pemain_router,tags=["Pemain"])
 app.include_router(router=pertanyaan_router,tags=["Pertanyaan"])
 app.include_router(router=tantangan_router,tags=["Tantangan"])
 app.include_router(router=permainan_router,tags=["Permainan"])
-
-
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
