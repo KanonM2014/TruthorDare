@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Truth or Dare</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="container">
+      <h1>Truth or Dare</h1>
+
+      <section class="card">
+        <h2>Pemain</h2>
+        <div class="row">
+          <input id="playerName" placeholder="Nama pemain" />
+          <button id="addPlayer">Tambah</button>
+        </div>
+        <ul id="playersList"></ul>
+      </section>
+
+      <section class="card">
+        <h2>Pertanyaan</h2>
+        <div class="row">
+          <input id="questionText" placeholder="Tulis pertanyaan" />
+          <button id="addQuestion">Tambah</button>
+        </div>
+        <ul id="questionsList"></ul>
+      </section>
+
+      <section class="card">
+        <h2>Tantangan</h2>
+        <div class="row">
+          <input id="challengeText" placeholder="Tulis tantangan" />
+          <button id="addChallenge">Tambah</button>
+        </div>
+        <ul id="challengesList"></ul>
+      </section>
+
+      <section class="card actions">
+        <h2>Permainan</h2>
+        <div class="row">
+          <button id="pickPlayer">Pilih Pemain Acak</button>
+          <button id="pickTruthOrDare">Pilih Truth atau Dare</button>
+          <button id="playRound">Mainkan Sekali (otomatis)</button>
+        </div>
+        <div id="result" class="result">Hasil akan muncul di sini.</div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
