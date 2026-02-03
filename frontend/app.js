@@ -1,148 +1,534 @@
-const baseUrl = 'http://localhost:8000'
+// API Base URL - sesuaikan dengan backend FastAPI
+const API_URL = "http://localhost:8000";
 
-// Helpers
-const qs = (s) => document.querySelector(s)
-const qsa = (s) => document.querySelectorAll(s)
+// State untuk edit modal
+let editState = {
+  type: null,
+  index: null,
+};
 
-async function request(path, method='GET'){
-  const url = `${baseUrl}${path}`
-  const res = await fetch(url, { method })
-  return res.ok ? res.text() : Promise.reject(await res.text())
-}
+// ===== Tab Navigation =====
+document.querySelectorAll(".tab-btn").forEach((button) => {
+  button.addEventListener("click", () => {
+    const tabId = button.getAttribute("data-tab");
 
-// Players
-async function loadPlayers(){
-  try{
-    const text = await request('/Pemain')
-    const list = JSON.parse(JSON.stringify(eval(text)))
-    // backend returns plain list; if string, try to parse
-    const players = Array.isArray(list)? list : (typeof text === 'string' && text.startsWith('[')? JSON.parse(text) : [])
-    renderList('playersList', players)
-  }catch(e){
-    // fallback: try text
-    const t = await request('/Pemain')
-    try{ renderList('playersList', JSON.parse(t)) }catch{ document.getElementById('playersList').innerHTML = `<li class="muted">${t}</li>` }
+    // Update active tab button
+    document
+      .querySelectorAll(".tab-btn")
+      .forEach((btn) => btn.classList.remove("active"));
+    button.classList.add("active");
+
+    // Update active tab content
+    document
+      .querySelectorAll(".tab-content")
+      .forEach((content) => content.classList.remove("active"));
+    document.getElementById(tabId).classList.add("active");
+
+    // Load data when switching tabs
+    if (tabId === "players") {
+      loadPemain();
+    } else if (tabId === "questions") {
+      loadPertanyaan();
+    } else if (tabId === "challenges") {
+      loadTantangan();
+    }
+  });
+});
+
+// ===== Game Functions =====
+async function acakPemain() {
+  try {
+    const response = await fetch(`${API_URL}/Acak-acakan`);
+    const data = await response.text();
+
+    const resultBox = document.getElementById("gameResult");
+    resultBox.innerHTML = `<p class="result-text">🎲 ${data}</p>`;
+    resultBox.classList.add("loading");
+    setTimeout(() => resultBox.classList.remove("loading"), 500);
+
+    // Tampilkan tombol aksi jika ada pemain
+    if (!data.includes("Tidak ada pemainnya")) {
+      document.getElementById("actionButtons").style.display = "flex";
+    }
+  } catch (error) {
+    showError("Gagal mengacak pemain. Pastikan server berjalan!");
   }
 }
 
-async function addPlayer(){
-  const name = qs('#playerName').value.trim()
-  if(!name) return
-  await fetch(`${baseUrl}/Pemain?Nama_Pemain=${encodeURIComponent(name)}`,{ method:'POST' })
-  qs('#playerName').value=''
-  await refreshAll()
-}
+async function acakTruthOrDare() {
+  try {
+    const response = await fetch(`${API_URL}/Acak-TruthorDare`);
+    const data = await response.text();
 
-// Questions
-async function loadQuestions(){
-  try{
-    const t = await request('/Pertanyaan')
-    try{ renderList('questionsList', JSON.parse(t)) }catch{ document.getElementById('questionsList').innerHTML = `<li class="muted">${t}</li>` }
-  }catch(e){ document.getElementById('questionsList').innerHTML = `<li class="muted">${e}</li>` }
-}
+    const resultBox = document.getElementById("gameResult");
+    const actionButtons = document.getElementById("actionButtons");
 
-async function addQuestion(){
-  const q = qs('#questionText').value.trim()
-  if(!q) return
-  await fetch(`${baseUrl}/Pertanyaan?pertanyaan=${encodeURIComponent(q)}`,{ method:'POST' })
-  qs('#questionText').value=''
-  await refreshAll()
-}
+    // Animasi loading
+    resultBox.classList.add("loading");
+    resultBox.innerHTML = `<p class="result-text">🔀 Mengacak...</p>`;
 
-// Challenges
-async function loadChallenges(){
-  try{
-    const t = await request('/Tantang')
-    try{ renderList('challengesList', JSON.parse(t)) }catch{ document.getElementById('challengesList').innerHTML = `<li class="muted">${t}</li>` }
-  }catch(e){ document.getElementById('challengesList').innerHTML = `<li class="muted">${e}</li>` }
-}
+    setTimeout(() => {
+      resultBox.innerHTML = `<p class="result-text">${data}</p>`;
+      resultBox.classList.remove("loading");
 
-async function addChallenge(){
-  const c = qs('#challengeText').value.trim()
-  if(!c) return
-  await fetch(`${baseUrl}/Tantang?Tantangan=${encodeURIComponent(c)}`,{ method:'POST' })
-  qs('#challengeText').value=''
-  await refreshAll()
-}
-
-// Render helper
-function renderList(elId, items){
-  const ul = document.getElementById(elId)
-  ul.innerHTML = ''
-  if(!items || items.length===0){ ul.innerHTML = '<li class="muted">(Kosong)</li>'; return }
-  items.forEach((it, idx)=>{
-    const li = document.createElement('li')
-    li.innerHTML = `<span>${it}</span><div><button class="small-btn" data-idx="${idx+1}" data-list="${elId}">Hapus</button></div>`
-    ul.appendChild(li)
-  })
-}
-
-// Delete handler (shared)
-async function handleDelete(idx, listName){
-  // determine endpoint from list
-  if(listName==='playersList'){
-    await fetch(`${baseUrl}/Pemain?Urutan=${idx}`,{ method:'DELETE' })
-  }else if(listName==='questionsList'){
-    await fetch(`${baseUrl}/Pertanyaan?Urutan=${idx}`,{ method:'DELETE' })
-  }else if(listName==='challengesList'){
-    await fetch(`${baseUrl}/Tantang?Urutan=${idx}`,{ method:'DELETE' })
+      // Deteksi Truth atau Dare dari response
+      if (data.includes("Truth")) {
+        // Tampilkan hanya tombol pertanyaan
+        actionButtons.innerHTML = `
+          <button class="btn btn-truth" onclick="acakPertanyaan()">
+            <span class="icon">❓</span>
+            Ambil Pertanyaan
+          </button>
+        `;
+        actionButtons.style.display = "flex";
+      } else if (data.includes("Dare")) {
+        // Tampilkan hanya tombol tantangan
+        actionButtons.innerHTML = `
+          <button class="btn btn-dare" onclick="acakTantangan()">
+            <span class="icon">🎯</span>
+            Ambil Tantangan
+          </button>
+        `;
+        actionButtons.style.display = "flex";
+      }
+    }, 800);
+  } catch (error) {
+    showError("Gagal mengacak Truth or Dare!");
   }
-  await refreshAll()
 }
 
-// Game actions
-async function pickPlayer(){
-  try{
-    const t = await request('/Acak-acakan')
-    qs('#result').textContent = t
-  }catch(e){ qs('#result').textContent = `Error: ${e}` }
+async function acakPertanyaan() {
+  try {
+    const response = await fetch(`${API_URL}/Acak Pertanyaan`);
+    const data = await response.text();
+
+    const resultBox = document.getElementById("gameResult");
+    resultBox.classList.add("loading");
+    resultBox.innerHTML = `<p class="result-text">❓ Memilih pertanyaan...</p>`;
+
+    setTimeout(() => {
+      resultBox.innerHTML = `<p class="result-text">${data}</p>`;
+      resultBox.classList.remove("loading");
+    }, 800);
+  } catch (error) {
+    showError("Gagal mengambil pertanyaan!");
+  }
 }
 
-async function pickTruthOrDare(){
-  try{
-    const td = await request('/Acak-TruthorDare')
-    qs('#result').textContent = td
-  }catch(e){ qs('#result').textContent = `Error: ${e}` }
+async function acakTantangan() {
+  try {
+    const response = await fetch(`${API_URL}/Acak Tantangan`);
+    const data = await response.text();
+
+    const resultBox = document.getElementById("gameResult");
+    resultBox.classList.add("loading");
+    resultBox.innerHTML = `<p class="result-text">🎯 Memilih tantangan...</p>`;
+
+    setTimeout(() => {
+      resultBox.innerHTML = `<p class="result-text">${data}</p>`;
+      resultBox.classList.remove("loading");
+    }, 800);
+  } catch (error) {
+    showError("Gagal mengambil tantangan!");
+  }
 }
 
-async function playRound(){
-  try{
-    const player = await request('/Acak-acakan')
-    const td = await request('/Acak-TruthorDare')
-    let extra = ''
-    if(td.includes('Truth')){
-      const q = await request(encodeURI('/Acak Pertanyaan'))
-      extra = q
-    }else{
-      const c = await request(encodeURI('/Acak Tantangan'))
-      extra = c
+// ===== Players Functions =====
+async function tambahPemain() {
+  const input = document.getElementById("playerName");
+  const nama = input.value.trim();
+
+  if (!nama) {
+    alert("Masukkan nama pemain!");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/Pemain?Nama_Pemain=${encodeURIComponent(nama)}`,
+      {
+        method: "POST",
+      }
+    );
+    const data = await response.text();
+
+    input.value = "";
+    loadPemain();
+    showSuccess(data);
+  } catch (error) {
+    showError("Gagal menambah pemain!");
+  }
+}
+
+async function loadPemain() {
+  try {
+    const response = await fetch(`${API_URL}/Pemain`);
+    const data = await response.json();
+
+    const list = document.getElementById("playersList");
+
+    if (!data || data.length === 0) {
+      list.innerHTML =
+        '<div class="empty-message">Belum ada pemain. Tambahkan pemain untuk memulai!</div>';
+      return;
     }
-    qs('#result').textContent = `${player} ${td} ${extra}`
-  }catch(e){ qs('#result').textContent = `Error: ${e}` }
+
+    list.innerHTML = data
+      .map(
+        (pemain, index) => `
+            <div class="item">
+                <div class="item-content">
+                    <span class="item-number">${index + 1}.</span>
+                    <span class="item-text">${pemain}</span>
+                </div>
+                <div class="item-actions">
+                    <button class="btn btn-edit" onclick="editPemain(${
+                      index + 1
+                    })">
+                        <span class="icon">✏️</span> Edit
+                    </button>
+                    <button class="btn btn-delete" onclick="hapusPemain(${
+                      index + 1
+                    })">
+                        <span class="icon">🗑️</span> Hapus
+                    </button>
+                </div>
+            </div>
+        `
+      )
+      .join("");
+  } catch (error) {
+    showError("Gagal memuat daftar pemain!");
+  }
 }
 
-async function refreshAll(){
-  await Promise.all([loadPlayers(), loadQuestions(), loadChallenges()])
+async function hapusPemain(urutan) {
+  if (!confirm("Yakin ingin menghapus pemain ini?")) return;
+
+  try {
+    const response = await fetch(`${API_URL}/Pemain?Urutan=${urutan}`, {
+      method: "DELETE",
+    });
+    const data = await response.text();
+
+    loadPemain();
+    showSuccess(data);
+  } catch (error) {
+    showError("Gagal menghapus pemain!");
+  }
 }
 
-// Event wiring
-document.addEventListener('DOMContentLoaded', ()=>{
-  qs('#addPlayer').addEventListener('click', addPlayer)
-  qs('#addQuestion').addEventListener('click', addQuestion)
-  qs('#addChallenge').addEventListener('click', addChallenge)
+function editPemain(urutan) {
+  editState = { type: "pemain", index: urutan };
+  showModal();
+}
 
-  qs('#pickPlayer').addEventListener('click', pickPlayer)
-  qs('#pickTruthOrDare').addEventListener('click', pickTruthOrDare)
-  qs('#playRound').addEventListener('click', playRound)
+async function updatePemain(urutan, namaBaru) {
+  try {
+    const response = await fetch(
+      `${API_URL}/Pemain?Urutan=${urutan}&Mengganti=${encodeURIComponent(
+        namaBaru
+      )}`,
+      {
+        method: "PUT",
+      }
+    );
+    const data = await response.text();
 
-  document.body.addEventListener('click', (ev)=>{
-    const b = ev.target.closest('button[data-idx]')
-    if(b){
-      const idx = b.getAttribute('data-idx')
-      const list = b.getAttribute('data-list')
-      handleDelete(idx, list)
+    loadPemain();
+    showSuccess(data);
+  } catch (error) {
+    showError("Gagal mengupdate pemain!");
+  }
+}
+
+// ===== Questions Functions =====
+async function tambahPertanyaan() {
+  const input = document.getElementById("questionText");
+  const pertanyaan = input.value.trim();
+
+  if (!pertanyaan) {
+    alert("Masukkan pertanyaan!");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/Pertanyaan?pertanyaan=${encodeURIComponent(pertanyaan)}`,
+      {
+        method: "POST",
+      }
+    );
+    const data = await response.text();
+
+    input.value = "";
+    loadPertanyaan();
+    showSuccess("Pertanyaan berhasil ditambahkan!");
+  } catch (error) {
+    showError("Gagal menambah pertanyaan!");
+  }
+}
+
+async function loadPertanyaan() {
+  try {
+    const response = await fetch(`${API_URL}/Pertanyaan`);
+    const questions = await response.json();
+
+    const list = document.getElementById("questionsList");
+
+    if (!questions || questions.length === 0) {
+      list.innerHTML =
+        '<div class="empty-message">Belum ada pertanyaan. Tambahkan pertanyaan untuk memulai!</div>';
+      return;
     }
-  })
 
-  refreshAll()
-})
+    list.innerHTML = questions
+      .map(
+        (pertanyaan, index) => `
+            <div class="item">
+                <div class="item-content">
+                    <span class="item-number">${index + 1}.</span>
+                    <span class="item-text">${pertanyaan}</span>
+                </div>
+                <div class="item-actions">
+                    <button class="btn btn-edit" onclick="editPertanyaan(${
+                      index + 1
+                    })">
+                        <span class="icon">✏️</span> Edit
+                    </button>
+                    <button class="btn btn-delete" onclick="hapusPertanyaan(${
+                      index + 1
+                    })">
+                        <span class="icon">🗑️</span> Hapus
+                    </button>
+                </div>
+            </div>
+        `
+      )
+      .join("");
+  } catch (error) {
+    showError("Gagal memuat daftar pertanyaan!");
+  }
+}
+
+async function hapusPertanyaan(urutan) {
+  if (!confirm("Yakin ingin menghapus pertanyaan ini?")) return;
+
+  try {
+    const response = await fetch(`${API_URL}/Pertanyaan?Urutan=${urutan}`, {
+      method: "DELETE",
+    });
+    const data = await response.text();
+
+    loadPertanyaan();
+    showSuccess(data);
+  } catch (error) {
+    showError("Gagal menghapus pertanyaan!");
+  }
+}
+
+function editPertanyaan(urutan) {
+  editState = { type: "pertanyaan", index: urutan };
+  showModal();
+}
+
+async function updatePertanyaan(urutan, textBaru) {
+  try {
+    const response = await fetch(
+      `${API_URL}/Pertanyaan?Urutan=${urutan}&Mengganti=${encodeURIComponent(
+        textBaru
+      )}`,
+      {
+        method: "PUT",
+      }
+    );
+    const data = await response.text();
+
+    loadPertanyaan();
+    showSuccess(data);
+  } catch (error) {
+    showError("Gagal mengupdate pertanyaan!");
+  }
+}
+
+// ===== Challenges Functions =====
+async function tambahTantangan() {
+  const input = document.getElementById("challengeText");
+  const tantangan = input.value.trim();
+
+  if (!tantangan) {
+    alert("Masukkan tantangan!");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/Tantang?Tantangan=${encodeURIComponent(tantangan)}`,
+      {
+        method: "POST",
+      }
+    );
+    const data = await response.text();
+
+    input.value = "";
+    loadTantangan();
+    showSuccess("Tantangan berhasil ditambahkan!");
+  } catch (error) {
+    showError("Gagal menambah tantangan!");
+  }
+}
+
+async function loadTantangan() {
+  try {
+    const response = await fetch(`${API_URL}/Tantang`);
+    const challenges = await response.json();
+
+    const list = document.getElementById("challengesList");
+
+    if (!challenges || challenges.length === 0) {
+      list.innerHTML =
+        '<div class="empty-message">Belum ada tantangan. Tambahkan tantangan untuk memulai!</div>';
+      return;
+    }
+
+    list.innerHTML = challenges
+      .map(
+        (tantangan, index) => `
+            <div class="item">
+                <div class="item-content">
+                    <span class="item-number">${index + 1}.</span>
+                    <span class="item-text">${tantangan}</span>
+                </div>
+                <div class="item-actions">
+                    <button class="btn btn-edit" onclick="editTantangan(${
+                      index + 1
+                    })">
+                        <span class="icon">✏️</span> Edit
+                    </button>
+                    <button class="btn btn-delete" onclick="hapusTantangan(${
+                      index + 1
+                    })">
+                        <span class="icon">🗑️</span> Hapus
+                    </button>
+                </div>
+            </div>
+        `
+      )
+      .join("");
+  } catch (error) {
+    showError("Gagal memuat daftar tantangan!");
+  }
+}
+
+async function hapusTantangan(urutan) {
+  if (!confirm("Yakin ingin menghapus tantangan ini?")) return;
+
+  try {
+    const response = await fetch(`${API_URL}/Tantang?Urutan=${urutan}`, {
+      method: "DELETE",
+    });
+    const data = await response.text();
+
+    loadTantangan();
+    showSuccess(data);
+  } catch (error) {
+    showError("Gagal menghapus tantangan!");
+  }
+}
+
+function editTantangan(urutan) {
+  editState = { type: "tantangan", index: urutan };
+  showModal();
+}
+
+async function updateTantangan(urutan, textBaru) {
+  try {
+    const response = await fetch(
+      `${API_URL}/Tantang?Urutan=${urutan}&Mengganti=${encodeURIComponent(
+        textBaru
+      )}`,
+      {
+        method: "PUT",
+      }
+    );
+    const data = await response.text();
+
+    loadTantangan();
+    showSuccess(data);
+  } catch (error) {
+    showError("Gagal mengupdate tantangan!");
+  }
+}
+
+// ===== Modal Functions =====
+function showModal() {
+  const modal = document.getElementById("editModal");
+  modal.style.display = "block";
+  document.getElementById("editText").focus();
+}
+
+function closeModal() {
+  const modal = document.getElementById("editModal");
+  modal.style.display = "none";
+  document.getElementById("editText").value = "";
+  editState = { type: null, index: null };
+}
+
+async function saveEdit() {
+  const newText = document.getElementById("editText").value.trim();
+
+  if (!newText) {
+    alert("Teks tidak boleh kosong!");
+    return;
+  }
+
+  const { type, index } = editState;
+
+  if (type === "pemain") {
+    await updatePemain(index, newText);
+  } else if (type === "pertanyaan") {
+    await updatePertanyaan(index, newText);
+  } else if (type === "tantangan") {
+    await updateTantangan(index, newText);
+  }
+
+  closeModal();
+}
+
+// Close modal when clicking outside
+window.onclick = function (event) {
+  const modal = document.getElementById("editModal");
+  if (event.target === modal) {
+    closeModal();
+  }
+};
+
+// ===== Notification Functions =====
+function showSuccess(message) {
+  // Simple alert - bisa diganti dengan toast notification
+  const resultBox = document.getElementById("gameResult");
+  const originalContent = resultBox.innerHTML;
+
+  resultBox.innerHTML = `<p class="result-text">✅ ${message}</p>`;
+
+  setTimeout(() => {
+    resultBox.innerHTML = originalContent;
+  }, 2000);
+}
+
+function showError(message) {
+  const resultBox = document.getElementById("gameResult");
+  const originalContent = resultBox.innerHTML;
+
+  resultBox.innerHTML = `<p class="result-text">❌ ${message}</p>`;
+
+  setTimeout(() => {
+    resultBox.innerHTML = originalContent;
+  }, 2000);
+}
+
+// ===== Initialize on Load =====
+document.addEventListener("DOMContentLoaded", () => {
+  // Load initial data
+  loadPemain();
+});

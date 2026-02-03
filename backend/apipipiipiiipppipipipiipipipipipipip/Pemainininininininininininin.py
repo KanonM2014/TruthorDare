@@ -1,11 +1,6 @@
 from fastapi import APIRouter
 
-
 Router=APIRouter()
-
-
-
-
 
 Pemain=[]
 @Router.post("/Pemain")

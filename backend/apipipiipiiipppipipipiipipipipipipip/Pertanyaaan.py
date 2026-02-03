@@ -13,10 +13,10 @@ def membuat(pertanyaan:str):
 @Router.get("/Pertanyaan")
 def membaca():
     if len(Nanya)> 0:
-        return f"{Nanya}"
+        return Nanya
     
     else:
-        return "Belum ada pertanyaan!"
+        return []
 
 @Router.delete("/Pertanyaan")
 def penghapusan(Urutan:int):
